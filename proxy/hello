@@ -1,0 +1,66 @@
+[{
+  "id": 4,
+  "name": Oran,
+  "wilaya": 31,
+  "tirage_id": 14
+}, {
+  "id": 10,
+  "name":  Bedradine el Mokrani,
+  "wilaya": 22,
+  "tirage_id": 
+}, {
+  "id": 11,
+  "name":  Belarbi,
+  "wilaya": 22,
+  "tirage_id": 
+}, {
+  "id": 12,
+  "name": Belalia Yemloul,
+  "wilaya": 22,
+  "tirage_id": 
+}, {
+  "id": 13,
+  "name": AIN TURK,
+  "wilaya": 31,
+  "tirage_id": 
+}, {
+  "id": 14,
+  "name": setif,
+  "wilaya": 19,
+  "tirage_id": 
+}, {
+  "id": 15,
+  "name": Aïn Arnat,
+  "wilaya": 19,
+  "tirage_id": 
+}, {
+  "id": 16,
+  "name": Aïn El Kebira,
+  "wilaya": 19,
+  "tirage_id": 
+}, {
+  "id": 5,
+  "name": Sidi Bel Abbes,
+  "wilaya": 22,
+  "tirage_id": 15
+}, {
+  "id": 6,
+  "name": Sidi Brahim,
+  "wilaya": 22,
+  "tirage_id": 15
+}, {
+  "id": 7,
+  "name": Ain Adden,
+  "wilaya": 22,
+  "tirage_id": 15
+}, {
+  "id": 8,
+  "name": Ain el Berd,
+  "wilaya": 22,
+  "tirage_id": 15
+}, {
+  "id": 9,
+  "name":  Ain Thrid,
+  "wilaya": 22,
+  "tirage_id": 15
+}]
