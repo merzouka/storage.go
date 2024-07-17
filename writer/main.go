@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -34,5 +33,10 @@ func main() {
             "message": "file saved successfully",
         })
     })
+
+    router.GET("/ping", func(ctx *gin.Context) {
+        ctx.String(http.StatusOK, "healthy")
+    })
+
     router.Run(":8080")
 }
