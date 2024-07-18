@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/merzouka/storage.go/health-check/models"
 	"gorm.io/gorm"
 )
@@ -63,6 +64,7 @@ func checker() {
 }
 
 func main() {
+    godotenv.Load(".env")
     db = models.GetConn()
     defer models.CloseConn()
 

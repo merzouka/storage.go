@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -15,7 +16,7 @@ func GetConn() *gorm.DB {
         return db
     }
 
-    sqlDB, err := sql.Open("pgx", "postgresql://neondb_owner:7L3BNrHmRubP@ep-flat-heart-a2q17yp9.eu-central-1.aws.neon.tech/neondb?sslmode=require")
+    sqlDB, err := sql.Open("pgx", os.Getenv("DBURL"))
     if err != nil {
         log.Fatal("failed to connect to database")
     }
