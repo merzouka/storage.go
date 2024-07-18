@@ -14,7 +14,6 @@ const MAX_ATTEMPTS int = 4
 
 func send() error {
 
-
     return nil
 }
 
