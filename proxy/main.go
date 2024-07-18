@@ -1,9 +1,10 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,6 +12,7 @@ import (
 
 func main() {
     router := gin.Default()
+    router.Use(cors.Default())
 
     router.POST("/upload", func(ctx *gin.Context) {
         form, err := ctx.MultipartForm()
@@ -22,14 +24,13 @@ func main() {
         filesArr := form.File
         names := []string{}
         for key, files := range filesArr {
-            log.Println(key)
             names = append(names, key)
             for _, file := range files {
-                ctx.SaveUploadedFile(file, "./hello")
+                ctx.SaveUploadedFile(file, fmt.Sprintf("./files/%s", key))
             }
         }
         ctx.JSON(http.StatusOK, map[string][]string{
-            "result": names,
+            "uploaded": names,
         })
     })
 
