@@ -48,33 +48,48 @@ func getInstances()[]Instance {
 }
 
 func send(instance Instance, request *http.Request, resolved chan map[Instance]string) error {
-    failure := false
+    failure := true
     var resp *http.Response = &http.Response{}
+    var err error
     for i := 0; i < MAX_ATTEMPTS; i++ {
         client := &http.Client{}
-        resp, err := client.Do(request)
-        if err == nil && resp.StatusCode / 100 == 2{
-            failure = true
-            break
+        resp, err = client.Do(request)
+        if err != nil {
+            log.Println(err)
         }
+        if err != nil {
+            continue
+        }
+        if resp.StatusCode / 100 != 2 {
+            resp.Body.Close()
+            continue
+        }
+        failure = false
+        break
     }
 
-    if failure {
+    // if resp != nil && resp.Body != nil {
+    if resp.Body != nil {
+        defer resp.Body.Close()
+    }
+
+    if !failure {
+        name := new(strings.Builder)
+        io.Copy(name, resp.Body)
         resolved <- map[Instance]string{
-            instance: "",
+            instance: name.String(),
         }
         return errors.New("failed to send request to back-end")
     }
 
-    name := new(strings.Builder)
-    io.Copy(name, resp.Body)
     resolved <- map[Instance]string{
-        instance: name.String(),
+        instance: "",
     }
     return nil
 }
 
 func sendGroup(key string, requestGroup []map[Instance]*http.Request) (FileSaveStatus, error) {
+    log.Println(fmt.Sprintf("file: %s", key))
     resolvedInstanceRequests := make(chan map[Instance]string)
     for _, instanceRequest := range requestGroup {
         for instance, request := range instanceRequest {
@@ -185,8 +200,7 @@ func main() {
 
                 buffer := bytes.NewBuffer(nil)
                 io.Copy(buffer, content)
-                res := buffer.Bytes()
-                fileWriter.Write(res)
+                fileWriter.Write(buffer.Bytes())
 
                 err = writer.Close()
                 if err != nil {
@@ -198,8 +212,9 @@ func main() {
 
                 requests := []map[Instance]*http.Request{}
                 skipGroup := false
+
                 for _, instance := range instances {
-                    request, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", instance.Path), body)
+                    request, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", instance.Path), bytes.NewReader(body.Bytes()))
                     if err != nil {
                     failedSaves[key] = FileSaveStatus{
                             Status: REQUEST_FAILED,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -11,16 +12,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func getName(original string) string {
+    return original
+}
+
 func main() {
+    number := os.Getenv("SERVER_NUMBER")
+    fmt.Printf("server: %s\n", number)
     router := gin.Default()
     router.POST("/upload", func(ctx *gin.Context) {
         buf := new(strings.Builder)
         file, _, err := ctx.Request.FormFile("file")
-        name := ctx.PostForm("name")
-        if name == "neon.json" {
+        name := getName(ctx.PostForm("name"))
+        if strings.Contains(name, number) {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "fuck neon",
+                "error": "fuck you",
             })
+            log.Println("won't save")
             return
         }
 
@@ -28,20 +36,23 @@ func main() {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
                 "message": "unable to open file, make sure to include a file in the request",
             })
+            log.Println("file open error")
             return
         }
+
         defer file.Close()
         _, err = io.Copy(buf, file)
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
                 "message": "unable to get the file's contents",
             })
+            log.Println("file open error")
+            return
         }
 
+        log.Println(fmt.Sprintf("saving:  %s\n", name))
         os.WriteFile(fmt.Sprintf("./files/%s", name), []byte(buf.String()), 0644)
-        ctx.JSON(http.StatusOK, map[string]string{
-            "message": "file saved successfully",
-        })
+        ctx.String(http.StatusOK, name)
     })
 
     router.DELETE("/rollback", func(ctx *gin.Context) {
@@ -56,7 +67,7 @@ func main() {
             return
         }
         name := body["name"]
-        if strings.Contains(name, "/") {
+        if strings.Contains(name, "/") || strings.Contains(name, "3") {
             ctx.JSON(http.StatusBadRequest, map[string]string{
                 "error": "please provide a valid file name",
             })
@@ -76,5 +87,5 @@ func main() {
         ctx.String(http.StatusOK, "healthy")
     })
 
-    router.Run(":8081")
+    router.Run(fmt.Sprintf(":808%s", number))
 }
