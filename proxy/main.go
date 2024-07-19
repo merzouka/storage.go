@@ -22,9 +22,34 @@ type FileSaveStatus struct {
     Instances []string
 }
 
-func send(instance string, request *http.Request, resolved chan map[string]string) error {
+type Instance struct {
+    Name string
+    Path string
+}
+
+const (
+    REQUEST_FAILED = "REQUEST_FAILED"
+    ROLLBACK_ERROR = "ROLLBACK_ERROR"
+    SAVE_ERROR = "SAVE_ERROR"
+    SUCCESS = "SUCCESS"
+)
+
+func getInstances()[]Instance {
+    return []Instance{
+        {
+            Name: "instance1",
+            Path: "http://localhost:8081",
+        },
+        {
+            Name: "instance2",
+            Path: "http://localhost:8082",
+        },
+    }
+}
+
+func send(instance Instance, request *http.Request, resolved chan map[Instance]string) error {
     failure := false
-    var resp *http.Response
+    var resp *http.Response = &http.Response{}
     for i := 0; i < MAX_ATTEMPTS; i++ {
         client := &http.Client{}
         resp, err := client.Do(request)
@@ -35,7 +60,7 @@ func send(instance string, request *http.Request, resolved chan map[string]strin
     }
 
     if failure {
-        resolved <- map[string]string{
+        resolved <- map[Instance]string{
             instance: "",
         }
         return errors.New("failed to send request to back-end")
@@ -43,14 +68,14 @@ func send(instance string, request *http.Request, resolved chan map[string]strin
 
     name := new(strings.Builder)
     io.Copy(name, resp.Body)
-    resolved <- map[string]string{
+    resolved <- map[Instance]string{
         instance: name.String(),
     }
     return nil
 }
 
-func sendGroup(key string, requestGroup []map[string]*http.Request, resolvedGroupRequests chan map[string]bool) (FileSaveStatus, error) {
-    resolvedInstanceRequests := make(chan map[string]string)
+func sendGroup(key string, requestGroup []map[Instance]*http.Request) (FileSaveStatus, error) {
+    resolvedInstanceRequests := make(chan map[Instance]string)
     for _, instanceRequest := range requestGroup {
         for instance, request := range instanceRequest {
             go send(instance, request, resolvedInstanceRequests)
@@ -58,7 +83,7 @@ func sendGroup(key string, requestGroup []map[string]*http.Request, resolvedGrou
     }
 
     // checking result
-    succeeded := map[string]string{}
+    succeeded := map[Instance]string{}
     rollback := false
     for range requestGroup {
         result := <-resolvedInstanceRequests
@@ -80,46 +105,40 @@ func sendGroup(key string, requestGroup []map[string]*http.Request, resolvedGrou
                 "name": name,
             })
             if err != nil {
-                failed = append(failed, instance)
+                failed = append(failed, instance.Name)
                 log.Println(fmt.Sprintf("failed to rollback %s", key))
                 continue
             }
             body := bytes.NewBuffer(content)
-            req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/rollback", instance), body)
+            req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/rollback", instance.Path), body)
             if err != nil {
-                failed = append(failed, instance)
+                failed = append(failed, instance.Name)
                 log.Println(fmt.Sprintf("failed to rollback %s", key))
                 continue
             }
             resp, err := client.Do(req)
             if err != nil || resp.StatusCode / 100 != 2 {
-                failed = append(failed, instance)
+                failed = append(failed, instance.Name)
                 log.Println(fmt.Sprintf("failed to rollback %s", key))
                 continue
             }
         }
 
-        resolvedGroupRequests <- map[string]bool{
-            key: false,
-        }
         if len(failed) > 0 {
             return FileSaveStatus{
-                Status: "",
+                Status: ROLLBACK_ERROR,
                 Instances: failed,
             }, errors.New(fmt.Sprintf("rollback failed for file %s, failed instances: %s", key, strings.Join(failed, ", ")))
         } else {
             return FileSaveStatus{
-                Status: "SAVE_FAILURE",
+                Status: SAVE_ERROR,
                 Instances: nil,
             }, errors.New(fmt.Sprintf("failed to save file %s", key))
         }
     }
 
-    resolvedGroupRequests <- map[string]bool{
-        key: true,
-    }
     return FileSaveStatus{
-        Status: "SUCCESS",
+        Status: SUCCESS,
         Instances: nil,
     }, nil
 }
@@ -134,15 +153,13 @@ func main() {
             ctx.JSON(http.StatusBadRequest, map[string]string{
                 "message": "please provide valid data",
             })
+            return
         }
 
         filesArr := form.File
-        var failed []string
-        attempts := 0
-        requestGroups := map[string][]*http.Request{}
-        instances := []string{
-            "http://localhost:8081",
-        }
+        failedSaves := map[string]FileSaveStatus{}
+        requestGroups := map[string][]map[Instance]*http.Request{}
+        instances := getInstances() 
 
         for key, files := range filesArr {
             for _, file := range files {
@@ -152,13 +169,17 @@ func main() {
                 fileWriter, err := writer.CreateFormFile("file", key)
 
                 if err != nil {
-                    failed = append(failed, key)
+                    failedSaves[key] = FileSaveStatus{
+                        Status: REQUEST_FAILED,
+                    }
                     break
                 }
 
                 content, err := file.Open()
                 if err != nil {
-                    failed = append(failed, key)
+                    failedSaves[key] = FileSaveStatus{
+                        Status: REQUEST_FAILED,
+                    }
                     break
                 }
 
@@ -169,52 +190,50 @@ func main() {
 
                 err = writer.Close()
                 if err != nil {
-                    failed = append(failed, key)
+                    failedSaves[key] = FileSaveStatus{
+                        Status: REQUEST_FAILED,
+                    }
                     break
                 }
 
-                requests := []*http.Request{}
+                requests := []map[Instance]*http.Request{}
                 skipGroup := false
                 for _, instance := range instances {
-                    request, err := http.NewRequest("POST", instance, body)
+                    request, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", instance.Path), body)
                     if err != nil {
-                        failed = append(failed, key)
+                    failedSaves[key] = FileSaveStatus{
+                            Status: REQUEST_FAILED,
+                    }
                         skipGroup = true
                         break
                     }
                     request.Header.Add("Content-Type", writer.FormDataContentType())
-                    requests = append(requests, request)
+                    requests = append(requests, map[Instance]*http.Request{
+                        instance: request,
+                    })
                 }
+
                 if !skipGroup {
                     requestGroups[key] = requests
                 }
             }
         }
 
-        resolved := make(chan map[string]bool)
         for key, requestGroup := range requestGroups {
-        }
-
-        for range requestGroups {
-            result := <-resolved
-            for key, status := range result {
-                if !status {
-                    failed = append(failed, key)
+            result, err := sendGroup(key, requestGroup)
+            if err != nil {
+                if result.Status != SUCCESS {
+                    failedSaves[key] = result
                 }
             }
-            
         }
+
         
-        if attempts == MAX_ATTEMPTS && len(failed) > 0 {
-            ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
-                "error": map[string]interface{}{
-                    "message": "failed to upload files",
-                    "files": failed,
-                },
-            })
+        if len(failedSaves) > 0 {
+            ctx.JSON(http.StatusInternalServerError, failedSaves)
         } else {
             ctx.JSON(http.StatusOK, map[string]string{
-                "message": "file saved successfully",
+                "message": "files saved successfully",
             })
         }
 
