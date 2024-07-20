@@ -55,12 +55,10 @@ func send(instance Instance, request *http.Request, resolved chan map[Instance]s
         client := &http.Client{}
         resp, err = client.Do(request)
         if err != nil {
-            log.Println(err)
-        }
-        if err != nil {
             continue
         }
         if resp.StatusCode / 100 != 2 {
+            io.ReadAll(resp.Body)
             resp.Body.Close()
             continue
         }
@@ -89,7 +87,6 @@ func send(instance Instance, request *http.Request, resolved chan map[Instance]s
 }
 
 func sendGroup(key string, requestGroup []map[Instance]*http.Request) (FileSaveStatus, error) {
-    log.Println(fmt.Sprintf("file: %s", key))
     resolvedInstanceRequests := make(chan map[Instance]string)
     for _, instanceRequest := range requestGroup {
         for instance, request := range instanceRequest {
