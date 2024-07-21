@@ -98,7 +98,7 @@ func main() {
         for file, revisions := range fileInfos {
             result = append(result, map[string]interface{}{
                 "name": file,
-                "metadata": getMetadata(file),
+                "metadata": getFileMetadata(file),
                 "revisions": revisions,
             })
         }
@@ -126,6 +126,17 @@ func main() {
             "contents": getFileContents(contents),
         })
     })
+
+    router.GET("/meta-data", func(ctx *gin.Context) {
+        metadata, err := getMetadata()
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, map[string]string {
+                "error": "failed to retrieve meta-data",
+            })
+            return
+        }
+        ctx.JSON(http.StatusOK, metadata)
+    })  
 
     router.GET("/ping", func(ctx *gin.Context) {
         ctx.String(http.StatusOK, "healthy")

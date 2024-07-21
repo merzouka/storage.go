@@ -38,7 +38,7 @@ func getOriginal(name string) string {
     return name
 }
 
-func getMetadata(file string) map[string]string {
+func getFileMetadata(file string) map[string]string {
     return map[string]string{
         "name": file,
     }
@@ -58,4 +58,8 @@ func validFileName(file string) bool {
 
 func getFileContents(contents []byte) string {
     return string(contents)
+}
+
+func getMetadata() (map[string]string, error) {
+    return nil, nil
 }
