@@ -8,24 +8,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func getName(original string) string {
-    parts := strings.Split(original, ".")
-    name := parts[0]
-    name += fmt.Sprintf("#%d", time.Now().Unix())
-    if len(parts) > 1 {
-        name += fmt.Sprintf(".%s", parts[1])
-    }
-    return name
-}
-
 func main() {
     number := os.Getenv("SERVER_NUMBER")
-    fmt.Printf("server: %s\n", number)
     if number == "" {
         number = "1"
     }
@@ -70,7 +58,7 @@ func main() {
         }
 
         name := body["name"]
-        if strings.Contains(name, "/") {
+        if !validFileName(name) {
             ctx.JSON(http.StatusBadRequest, map[string]string{
                 "error": "please provide a valid file name",
             })
@@ -87,6 +75,56 @@ func main() {
 
         log.Printf("rolling back: %s\n", name)
         ctx.String(http.StatusOK, "success")
+    })
+
+    router.GET("/files", func(ctx *gin.Context) {
+        files, err := os.ReadDir("./files")
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, map[string]string{
+                "error": "failed to retrieve files",
+            })
+            return
+        }
+        fileInfos := map[string][]map[string]string{}
+        for _, file := range files {
+            info, err := file.Info()
+            if err != nil {
+                log.Println(fmt.Sprintf("failed to retrieve info for file: %s", file.Name()))
+                continue
+            }
+            fileInfos[getOriginal(file.Name())] = append(fileInfos[getOriginal(file.Name())], getFileInfo(info))
+        }
+        result := []map[string]interface{}{}
+        for file, revisions := range fileInfos {
+            result = append(result, map[string]interface{}{
+                "name": file,
+                "metadata": getMetadata(file),
+                "revisions": revisions,
+            })
+        }
+        ctx.JSON(http.StatusOK, map[string]interface{}{
+            "result": result,
+        })
+    })
+
+    router.GET("/files/:name", func(ctx *gin.Context) {
+        name := ctx.Params.ByName("name")
+        if !validFileName(name) {
+            ctx.JSON(http.StatusBadRequest, map[string]string{
+                "error": "please provide a valid file name",
+            })
+            return
+        }
+        contents, err := os.ReadFile(fmt.Sprintf("./files/%s", name))
+        if err != nil {
+            ctx.JSON(http.StatusBadRequest, map[string]string{
+                "error": "please provide a valid file name",
+            })
+            return
+        }
+        ctx.JSON(http.StatusOK, map[string]string{
+            "contents": getFileContents(contents),
+        })
     })
 
     router.GET("/ping", func(ctx *gin.Context) {
