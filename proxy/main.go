@@ -40,10 +40,10 @@ func getInstances()[]Instance {
             Name: "instance1",
             Path: "http://localhost:8081",
         },
-        {
-            Name: "instance2",
-            Path: "http://localhost:8082",
-        },
+        // {
+        //     Name: "instance2",
+        //     Path: "http://localhost:8082",
+        // },
     }
 }
 
@@ -66,14 +66,14 @@ func send(instance Instance, request *http.Request, resolved chan map[Instance]s
         break
     }
 
-    // if resp != nil && resp.Body != nil {
-    if resp.Body != nil {
+    if resp != nil && resp.Body != nil {
         defer resp.Body.Close()
     }
 
     if !failure {
         name := new(strings.Builder)
         io.Copy(name, resp.Body)
+        log.Println(name)
         resolved <- map[Instance]string{
             instance: name.String(),
         }

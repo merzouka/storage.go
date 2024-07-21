@@ -8,35 +8,38 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 func getName(original string) string {
-    return original
+    parts := strings.Split(original, ".")
+    name := parts[0]
+    name += fmt.Sprintf("#%d", time.Now().Unix())
+    if len(parts) > 1 {
+        name += fmt.Sprintf(".%s", parts[1])
+    }
+    return name
 }
 
 func main() {
     number := os.Getenv("SERVER_NUMBER")
     fmt.Printf("server: %s\n", number)
+    if number == "" {
+        number = "1"
+    }
+
     router := gin.Default()
     router.POST("/upload", func(ctx *gin.Context) {
         buf := new(strings.Builder)
         file, _, err := ctx.Request.FormFile("file")
         name := getName(ctx.PostForm("name"))
-        if strings.Contains(name, number) {
-            ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "fuck you",
-            })
-            log.Println("won't save")
-            return
-        }
 
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
                 "message": "unable to open file, make sure to include a file in the request",
             })
-            log.Println("file open error")
             return
         }
 
@@ -46,7 +49,6 @@ func main() {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
                 "message": "unable to get the file's contents",
             })
-            log.Println("file open error")
             return
         }
 
@@ -66,13 +68,15 @@ func main() {
             })
             return
         }
+
         name := body["name"]
-        if strings.Contains(name, "/") || strings.Contains(name, "3") {
+        if strings.Contains(name, "/") {
             ctx.JSON(http.StatusBadRequest, map[string]string{
                 "error": "please provide a valid file name",
             })
             return
         }
+
         err = os.Remove(fmt.Sprintf("./files/%s", name))
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
@@ -80,6 +84,8 @@ func main() {
             })
             return
         }
+
+        log.Printf("rolling back: %s\n", name)
         ctx.String(http.StatusOK, "success")
     })
 
