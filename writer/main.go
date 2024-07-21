@@ -23,6 +23,7 @@ func main() {
         buf := new(strings.Builder)
         file, _, err := ctx.Request.FormFile("file")
         name := getName(ctx.PostForm("name"))
+        metadata := ctx.PostForm("meta-data")
 
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, map[string]string{

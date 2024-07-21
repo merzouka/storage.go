@@ -3,11 +3,13 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
+	"os"
+	"strings"
 	"time"
-    "fmt"
-    "strings"
-    "os"
+
+	"github.com/merzouka/storage.go/writer/models"
 )
 
 func getTag() string {
@@ -62,4 +64,32 @@ func getFileContents(contents []byte) string {
 
 func getMetadata() (map[string]string, error) {
     return nil, nil
+}
+
+func parseMetadata(metadata string) map[string]string {
+    infos := strings.Split(metadata, ",")
+    result := map[string]string{}
+    for _, info := range infos {
+        parts := strings.Split(info, "=")
+        result[parts[0]] = parts[1]
+    }
+
+    return result
+}
+
+func updateOrInsertFileMetadata(file string, metadata string) map[string]interface{} {
+    db := models.GetConn()
+    var fileMetadata models.Metadata
+    db.Where("name = ?", file).First(&fileMetadata)
+    fileMetadata = models.Metadata{
+        ID: fileMetadata.ID,
+        Name: file,
+        Metadata: metadata,
+    }
+    db.Save(&fileMetadata)
+
+    return map[string]interface{}{
+        "name": file,
+        "metadata": parseMetadata(metadata),
+    }
 }
