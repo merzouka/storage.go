@@ -1,6 +1,6 @@
 package models
 
-type Metadata struct {
+type File struct {
     ID uint `gorm:"primaryKey,autoIncrement"`
     Name string
     Metadata string

@@ -7,13 +7,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/merzouka/storage.go/writer/models"
 )
 
 func main() {
     number := os.Getenv("SERVER_NUMBER")
+    models.GetConn()
     if number == "" {
         number = "1"
     }
@@ -43,7 +46,12 @@ func main() {
 
         log.Println(fmt.Sprintf("saving:  %s\n", name))
         os.WriteFile(fmt.Sprintf("./files/%s", name), []byte(buf.String()), 0644)
-        ctx.String(http.StatusOK, name)
+        resp := map[string]interface{}{}
+        if metadata != "" {
+            resp = saveFileMetadata(getOriginal(name), metadata)
+        }
+        resp["name"] = name
+        ctx.JSON(http.StatusOK, resp)
     })
 
     router.DELETE("/rollback", func(ctx *gin.Context) {
@@ -73,33 +81,77 @@ func main() {
             })
             return
         }
+        
+        if len(getRevisions(getOriginal(name))) == 0 {
+            err := removeMetadata(getOriginal(name))
+            if err != nil {
+                ctx.JSON(http.StatusInternalServerError, map[string]string{
+                    "message": "deleted file successfully",
+                    "error": "failed to delete file meta-data",
+                })
+                return
+            }
+        }
 
         log.Printf("rolling back: %s\n", name)
         ctx.String(http.StatusOK, "success")
     })
 
     router.GET("/files", func(ctx *gin.Context) {
+        log.Println("entering handler")
         files, err := os.ReadDir("./files")
+        query := ctx.Query("query")
+        metadataQuery := ctx.Query("meta-data")
+
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
                 "error": "failed to retrieve files",
             })
             return
         }
+
         fileInfos := map[string][]map[string]string{}
+        exp := fmt.Sprintf(".*%s.*", query)
         for _, file := range files {
             info, err := file.Info()
             if err != nil {
                 log.Println(fmt.Sprintf("failed to retrieve info for file: %s", file.Name()))
                 continue
             }
-            fileInfos[getOriginal(file.Name())] = append(fileInfos[getOriginal(file.Name())], getFileInfo(info))
+
+            if query != "" {
+                match, err := regexp.MatchString(exp, file.Name())
+                if err == nil && match {
+                    fileInfos[getOriginal(file.Name())] = append(fileInfos[getOriginal(file.Name())], getFileInfo(info))
+                }
+            } else {
+                fileInfos[getOriginal(file.Name())] = append(fileInfos[getOriginal(file.Name())], getFileInfo(info))
+            }
         }
+
         result := []map[string]interface{}{}
+        exp = fmt.Sprintf(".*%s.*", metadataQuery)
         for file, revisions := range fileInfos {
+            fileMetadata, err := getFileMetadata(file)
+            if err == nil {
+                match, err := regexp.MatchString(exp, fileMetadata)
+                if err != nil || !match {
+                    continue
+                }
+            } else {
+                if metadataQuery != "" {
+                    continue
+                }
+                result = append(result, map[string]interface{}{
+                    "name": file,
+                    "revisions": revisions,
+                })
+                continue
+            }
+
             result = append(result, map[string]interface{}{
                 "name": file,
-                "metadata": getFileMetadata(file),
+                "metadata": parseMetadata(fileMetadata),
                 "revisions": revisions,
             })
         }
@@ -116,28 +168,21 @@ func main() {
             })
             return
         }
-        contents, err := os.ReadFile(fmt.Sprintf("./files/%s", name))
+
+        contents, err := os.ReadFile(getFilePath(name))
         if err != nil {
             ctx.JSON(http.StatusBadRequest, map[string]string{
                 "error": "please provide a valid file name",
             })
             return
         }
-        ctx.JSON(http.StatusOK, map[string]string{
+        metadata, err := getFileMetadata(getOriginal(name))
+
+        ctx.JSON(http.StatusOK, map[string]interface{}{
             "contents": getFileContents(contents),
+            "metadata": parseMetadata(metadata),
         })
     })
-
-    router.GET("/meta-data", func(ctx *gin.Context) {
-        metadata, err := getMetadata()
-        if err != nil {
-            ctx.JSON(http.StatusInternalServerError, map[string]string {
-                "error": "failed to retrieve meta-data",
-            })
-            return
-        }
-        ctx.JSON(http.StatusOK, metadata)
-    })  
 
     router.GET("/ping", func(ctx *gin.Context) {
         ctx.String(http.StatusOK, "healthy")

@@ -3,13 +3,19 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/merzouka/storage.go/writer/models"
+)
+
+const (
+    DATABASE_CONNECTION_ERROR = "failed to connect to database"
 )
 
 func getTag() string {
@@ -40,10 +46,19 @@ func getOriginal(name string) string {
     return name
 }
 
-func getFileMetadata(file string) map[string]string {
-    return map[string]string{
-        "name": file,
+func getFileMetadata(name string) (string, error) {
+    db := models.GetConn()
+    if db == nil {
+        return "", errors.New(DATABASE_CONNECTION_ERROR)
     }
+
+    var file models.File
+    result := db.Where("name = ?", name).First(&file)
+    if result.Error != nil {
+        return "", errors.New("file has no meta-data saved")
+    }
+
+    return file.Metadata, nil
 }
 
 func getFileInfo(info os.FileInfo) map[string]string {
@@ -62,10 +77,6 @@ func getFileContents(contents []byte) string {
     return string(contents)
 }
 
-func getMetadata() (map[string]string, error) {
-    return nil, nil
-}
-
 func parseMetadata(metadata string) map[string]string {
     infos := strings.Split(metadata, ",")
     result := map[string]string{}
@@ -77,11 +88,17 @@ func parseMetadata(metadata string) map[string]string {
     return result
 }
 
-func updateOrInsertFileMetadata(file string, metadata string) map[string]interface{} {
+func saveFileMetadata(file string, metadata string) map[string]interface{} {
     db := models.GetConn()
-    var fileMetadata models.Metadata
+    if db == nil {
+        return map[string]interface{}{
+            "message": "saved file successfully",
+            "error": "failed to save file meta-data",
+        }
+    }
+    var fileMetadata models.File
     db.Where("name = ?", file).First(&fileMetadata)
-    fileMetadata = models.Metadata{
+    fileMetadata = models.File{
         ID: fileMetadata.ID,
         Name: file,
         Metadata: metadata,
@@ -92,4 +109,71 @@ func updateOrInsertFileMetadata(file string, metadata string) map[string]interfa
         "name": file,
         "metadata": parseMetadata(metadata),
     }
+}
+
+func getRevisions(original string) []os.DirEntry {
+    files, err := os.ReadDir("./files/")
+    if err != nil {
+        return []os.DirEntry{}
+    }
+    parts := strings.Split(original, ".")
+    exp := fmt.Sprintf("^%s#[0-9]+", parts[0])
+    if len(parts) > 0 {
+        exp += "." + parts[1]
+    }
+    result := []os.DirEntry{}
+    for _, file := range files {
+        if match, err := regexp.MatchString(exp, file.Name()); err == nil && match {
+            result = append(result, file)
+        }
+    }
+
+    return result
+}
+
+func removeMetadata(name string) error {
+    db := models.GetConn()
+    if db == nil {
+        return errors.New(DATABASE_CONNECTION_ERROR)
+    }
+
+    var file models.File
+    result := db.Where("name = ?", name).First(&file)
+    if result.Error != nil {
+        return nil
+    }
+
+    result = db.Delete(&file)
+    if result.Error != nil {
+        return errors.New("failed to delete file meta-data")
+    }
+
+    return nil
+}
+
+func getFilePath(name string) string {
+    var latest os.FileInfo = nil
+    var err error
+    if !strings.Contains(name, "#") {
+        revisions := getRevisions(name)
+        if len(revisions) == 0 {
+            return ""
+        }
+        latest, err = revisions[0].Info()
+        if err != nil {
+            return "" 
+        }
+        for _, file := range revisions {
+            info, err := file.Info()
+            if err != nil {
+                continue
+            }
+            if info.ModTime().After(latest.ModTime()) {
+                latest = info
+            }
+        }
+        name = latest.Name()
+    }
+
+    return fmt.Sprintf("./files/%s", latest.Name())
 }

@@ -47,6 +47,12 @@ func getInstances()[]Instance {
     }
 }
 
+func getFileName(resp string) string {
+    var result map[string]string
+    json.Unmarshal([]byte(resp), &result)
+    return result["name"]
+}
+
 func send(instance Instance, request *http.Request, resolved chan map[Instance]string) error {
     failure := true
     var resp *http.Response = &http.Response{}
@@ -71,11 +77,11 @@ func send(instance Instance, request *http.Request, resolved chan map[Instance]s
     }
 
     if !failure {
-        name := new(strings.Builder)
-        io.Copy(name, resp.Body)
-        log.Println(name)
+        resultStr := new(strings.Builder)
+        io.Copy(resultStr, resp.Body)
+        name := getFileName(resultStr.String())
         resolved <- map[Instance]string{
-            instance: name.String(),
+            instance: name,
         }
         return errors.New("failed to send request to back-end")
     }
