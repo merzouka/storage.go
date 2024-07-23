@@ -24,13 +24,7 @@ func getTag() string {
 }
 
 func getName(original string) string {
-    parts := strings.Split(original, ".")
-    name := parts[0]
-    name += "#" + getTag()
-    if len(parts) > 1 {
-        name += fmt.Sprintf(".%s", parts[1])
-    }
-    return name
+    return original
 }
 
 func getOriginal(name string) string {
@@ -78,6 +72,9 @@ func getFileContents(contents []byte) string {
 }
 
 func parseMetadata(metadata string) map[string]string {
+    if metadata == "" {
+        return map[string]string{}
+    }
     infos := strings.Split(metadata, ",")
     result := map[string]string{}
     for _, info := range infos {
@@ -176,4 +173,18 @@ func getFilePath(name string) string {
     }
 
     return fmt.Sprintf("./files/%s", latest.Name())
+}
+
+func metadataMatch(file string, query string) bool {
+    metadata := parseMetadata(query)
+
+    for key, value := range metadata {
+        exp := fmt.Sprintf("%s=%s", key, value)
+        match, err := regexp.MatchString(exp, file)
+        if err != nil || !match {
+            return false
+        }
+    }
+
+    return true
 }

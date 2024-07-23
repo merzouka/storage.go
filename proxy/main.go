@@ -2,14 +2,18 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -33,6 +37,21 @@ const (
     SAVE_ERROR = "SAVE_ERROR"
     SUCCESS = "SUCCESS"
 )
+
+func getTag() string {
+    hash := sha256.Sum256([]byte(fmt.Sprintf("%d", time.Now().Unix() + rand.Int63())))
+    return hex.EncodeToString(hash[:])
+}
+
+func getName(original string) string {
+    parts := strings.Split(original, ".")
+    name := parts[0]
+    name += "#" + getTag()
+    if len(parts) > 1 {
+        name += fmt.Sprintf(".%s", parts[1])
+    }
+    return name
+}
 
 func getInstances()[]Instance {
     return []Instance{
@@ -177,13 +196,13 @@ func main() {
         filesArr := form.File
         failedSaves := map[string]FileSaveStatus{}
         requestGroups := map[string][]map[Instance]*http.Request{}
-        instances := getInstances() 
+        instances := getInstances()
 
         for key, files := range filesArr {
             for _, file := range files {
                 body := new(bytes.Buffer)
                 writer := multipart.NewWriter(body)
-                writer.WriteField("name", key)
+                writer.WriteField("name", getName(key))
                 fileWriter, err := writer.CreateFormFile("file", key)
 
                 if err != nil {

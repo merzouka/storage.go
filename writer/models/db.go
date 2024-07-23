@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+    "github.com/lpernett/godotenv"
 )
 
 var db *gorm.DB
@@ -15,11 +17,17 @@ const (
     host = "localhost"
     port = 5432
     user = "docker"
-    password = "Kev06122003"
     dbname = "metadata"
 )
 
 func GetConn() *gorm.DB {
+    err := godotenv.Load()
+    if err != nil {
+        log.Println("failed to load database password")
+        return nil
+    }
+
+    password := os.Getenv("DB_PASSWORD")
     if db != nil {
         return db
     }

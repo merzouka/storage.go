@@ -59,6 +59,7 @@ func main() {
         io.Copy(bodyStr, ctx.Request.Body)
         var body map[string]string
         err := json.Unmarshal([]byte(bodyStr.String()), &body)
+
         if err != nil {
             ctx.JSON(http.StatusBadRequest, map[string]string{
                 "error": "please provide a valid file name",
@@ -81,7 +82,7 @@ func main() {
             })
             return
         }
-        
+
         if len(getRevisions(getOriginal(name))) == 0 {
             err := removeMetadata(getOriginal(name))
             if err != nil {
@@ -94,7 +95,9 @@ func main() {
         }
 
         log.Printf("rolling back: %s\n", name)
-        ctx.String(http.StatusOK, "success")
+        ctx.JSON(http.StatusOK, map[string]string{
+            "message": "rollback successful",
+        })
     })
 
     router.GET("/files", func(ctx *gin.Context) {
@@ -111,7 +114,6 @@ func main() {
         }
 
         fileInfos := map[string][]map[string]string{}
-        exp := fmt.Sprintf(".*%s.*", query)
         for _, file := range files {
             info, err := file.Info()
             if err != nil {
@@ -120,7 +122,7 @@ func main() {
             }
 
             if query != "" {
-                match, err := regexp.MatchString(exp, file.Name())
+                match, err := regexp.MatchString(query, file.Name())
                 if err == nil && match {
                     fileInfos[getOriginal(file.Name())] = append(fileInfos[getOriginal(file.Name())], getFileInfo(info))
                 }
@@ -130,12 +132,10 @@ func main() {
         }
 
         result := []map[string]interface{}{}
-        exp = fmt.Sprintf(".*%s.*", metadataQuery)
         for file, revisions := range fileInfos {
             fileMetadata, err := getFileMetadata(file)
             if err == nil {
-                match, err := regexp.MatchString(exp, fileMetadata)
-                if err != nil || !match {
+                if !metadataMatch(fileMetadata, metadataQuery) {
                     continue
                 }
             } else {
@@ -154,7 +154,9 @@ func main() {
                 "metadata": parseMetadata(fileMetadata),
                 "revisions": revisions,
             })
+            log.Println("match")
         }
+
         ctx.JSON(http.StatusOK, map[string]interface{}{
             "result": result,
         })

@@ -2,9 +2,13 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"regexp"
 )
 
 func main() {
-    fmt.Println(strings.Split("hello", "#"))
+    match, err := regexp.MatchString("hello=false", "dudas=false,man=true")
+    if err != nil {
+        fmt.Println(err)
+    }
+    fmt.Println(match)
 }
