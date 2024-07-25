@@ -1,20 +1,19 @@
 FROM golang:1.22 as base
 WORKDIR /app
-VOLUME [ "/files" ]
 
-COPY go.mod go.sum ./
+COPY go.sum go.mod ./
 RUN go mod download
 
-COPY *.go ./
+COPY *.go models ./
 RUN CGO_ENABLED=0 go build -o /server .
 
-FROM gcr.io/distroless/base-debian11 as build-release
+FROM gcr.io/distroless/base-debian11 as release
 WORKDIR /
-
 COPY --from=base /server /server
 
-EXPOSE 8081
-# USER nonroot:nonroot
+USER nonroot
+
+EXPOSE 8080
 
 ENV GIN_MODE=release
 CMD [ "/server" ]

@@ -285,5 +285,88 @@ func main() {
 
     })
 
+    router.GET("/files", func(ctx *gin.Context) {
+        queryParts := []string{}
+        for key, values := range ctx.Request.URL.Query() {
+            for _, value := range values {
+                queryParts = append(queryParts, fmt.Sprintf("%s=%s", key, value))
+            }
+        }
+        query := strings.Join(queryParts, "&")
+
+        var resp *http.Response
+        var err error
+        client := &http.Client{}
+        for _, instance := range getInstances() {
+            var req *http.Request
+            req, err = http.NewRequest("GET", fmt.Sprintf("%s/files?%s", instance.Path, query), nil)
+            if err != nil {
+                continue
+            }
+            resp, err = client.Do(req)
+            if err != nil || resp.StatusCode / 100 != 2 {
+                continue
+            }
+            break
+        }
+        if err != nil || resp.StatusCode / 100 != 2 {
+            ctx.JSON(http.StatusInternalServerError, map[string]string{
+                "error": "failed to fetch saved files",
+            })
+            return 
+        }
+
+        var result map[string]interface{}
+        buffer := new(bytes.Buffer)
+        _, err = io.Copy(buffer, resp.Body)
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, map[string]string{
+                "error": "failed to fetch saved files",
+            })
+            return 
+        }
+
+        json.Unmarshal(buffer.Bytes(), &result)
+        ctx.JSON(http.StatusOK, result)
+    })
+
+    router.GET("/files/:name", func(ctx *gin.Context) {
+        name := ctx.Param("name")
+        var resp *http.Response
+        var err error
+        client := &http.Client{}
+        for _, instance := range getInstances() {
+            var req *http.Request
+            req, err = http.NewRequest("GET", fmt.Sprintf("%s/files/%s", instance.Path, name), nil)
+            if err != nil {
+                continue
+            }
+            resp, err = client.Do(req)
+            if err != nil || resp.StatusCode / 100 != 2 {
+                continue
+            }
+            break
+        }
+        if err != nil || resp.StatusCode / 100 != 2 {
+            ctx.JSON(http.StatusInternalServerError, map[string]string{
+                "error": "failed to fetch file contents",
+            })
+            return
+        }
+
+        buffer := new(bytes.Buffer)
+        _, err = io.Copy(buffer, resp.Body)
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, map[string]string{
+                "error": "failed to fetch file contents",
+            })
+            return
+        }
+
+        var result map[string]interface{}
+        json.Unmarshal(buffer.Bytes(), &result)
+        ctx.JSON(http.StatusOK, result)
+    })
+
     router.Run(":8080")
 }
