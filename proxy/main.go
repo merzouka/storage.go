@@ -111,7 +111,7 @@ func send(instance Instance, request *http.Request, resolved chan map[Instance]s
     return nil
 }
 
-func sendGroup(key string, requestGroup []map[Instance]*http.Request) (FileSaveStatus, error) {
+func sendGroup(key string, requestGroup []map[Instance]*http.Request, metadata string) (FileSaveStatus, error) {
     resolvedInstanceRequests := make(chan map[Instance]string)
     for _, instanceRequest := range requestGroup {
         for instance, request := range instanceRequest {
@@ -174,6 +174,14 @@ func sendGroup(key string, requestGroup []map[Instance]*http.Request) (FileSaveS
         }
     }
 
+    _, err := saveMetadata(key, metadata)
+    if err != nil {
+        return FileSaveStatus{
+            Status: METADATA_SAVE_ERROR,
+            Instances: nil,
+        }, errors.New(fmt.Sprintf("failed to save meta-data for file %s", key))
+    }
+
     return FileSaveStatus{
         Status: SUCCESS,
         Instances: nil,
@@ -193,12 +201,13 @@ func main() {
             return
         }
 
-        filesArr := form.File
+        metadata := ctx.PostForm("meta-data")
+
         failedSaves := map[string]FileSaveStatus{}
         requestGroups := map[string][]map[Instance]*http.Request{}
         instances := getInstances()
 
-        for key, files := range filesArr {
+        for key, files := range form.File {
             for _, file := range files {
                 body := new(bytes.Buffer)
                 writer := multipart.NewWriter(body)
@@ -257,7 +266,7 @@ func main() {
         }
 
         for key, requestGroup := range requestGroups {
-            result, err := sendGroup(key, requestGroup)
+            result, err := sendGroup(key, requestGroup, metadata)
             if err != nil {
                 if result.Status != SUCCESS {
                     failedSaves[key] = result
