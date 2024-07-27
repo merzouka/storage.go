@@ -4,7 +4,8 @@ WORKDIR /app
 COPY go.sum go.mod ./
 RUN go mod download
 
-COPY *.go models ./
+ENV GOPATH=/go
+COPY . ./
 RUN CGO_ENABLED=0 go build -o /server .
 
 FROM gcr.io/distroless/base-debian11 as release
