@@ -2,13 +2,9 @@ package main
 
 import (
 	"fmt"
-	"regexp"
+	"os"
 )
 
 func main() {
-    match, err := regexp.MatchString("hello=false", "dudas=false,man=true")
-    if err != nil {
-        fmt.Println(err)
-    }
-    fmt.Println(match)
+    fmt.Println(os.Getenv("PATH"))
 }
