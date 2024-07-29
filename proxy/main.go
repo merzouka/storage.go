@@ -2,18 +2,14 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
-	"mime/multipart"
 	"net/http"
+	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -27,8 +23,8 @@ type FileSaveStatus struct {
 }
 
 type Instance struct {
-    Name string
-    Path string
+    Name string `json:"name"`
+    Path string `json:"path"`
 }
 
 const (
@@ -37,40 +33,6 @@ const (
     SAVE_ERROR = "SAVE_ERROR"
     SUCCESS = "SUCCESS"
 )
-
-func getTag() string {
-    hash := sha256.Sum256([]byte(fmt.Sprintf("%d", time.Now().Unix() + rand.Int63())))
-    return hex.EncodeToString(hash[:])
-}
-
-func getName(original string) string {
-    parts := strings.Split(original, ".")
-    name := parts[0]
-    name += "#" + getTag()
-    if len(parts) > 1 {
-        name += fmt.Sprintf(".%s", parts[1])
-    }
-    return name
-}
-
-func getInstances()[]Instance {
-    return []Instance{
-        {
-            Name: "instance1",
-            Path: "http://localhost:8081",
-        },
-        // {
-        //     Name: "instance2",
-        //     Path: "http://localhost:8082",
-        // },
-    }
-}
-
-func getFileName(resp string) string {
-    var result map[string]string
-    json.Unmarshal([]byte(resp), &result)
-    return result["name"]
-}
 
 func send(instance Instance, request *http.Request, resolved chan map[Instance]string) error {
     failure := true
@@ -188,185 +150,30 @@ func sendGroup(key string, requestGroup []map[Instance]*http.Request, metadata s
     }, nil
 }
 
+func setLogger(path string) *os.File {
+    f, err := os.OpenFile(path, os.O_APPEND | os.O_CREATE | os.O_RDWR, 0664)
+    if err != nil {
+        log.Fatal("failed to set log destination")
+    }
+    log.SetOutput(f)
+    return f
+}
+
 func main() {
+    path := os.Getenv("LOGS_PATH")
+    if path == "" {
+        path = "./logs"
+    }
+    defer setLogger(path).Close()
+
     router := gin.Default()
     router.Use(cors.Default())
 
-    router.POST("/upload", func(ctx *gin.Context) {
-        form, err := ctx.MultipartForm()
-        if err != nil {
-            ctx.JSON(http.StatusBadRequest, map[string]string{
-                "message": "please provide valid data",
-            })
-            return
-        }
+    router.POST("/upload", uploadFiles)
 
-        metadata := ctx.PostForm("meta-data")
+    router.GET("/files", getFiles)
 
-        failedSaves := map[string]FileSaveStatus{}
-        requestGroups := map[string][]map[Instance]*http.Request{}
-        instances := getInstances()
-
-        for key, files := range form.File {
-            for _, file := range files {
-                body := new(bytes.Buffer)
-                writer := multipart.NewWriter(body)
-                writer.WriteField("name", getName(key))
-                fileWriter, err := writer.CreateFormFile("file", key)
-
-                if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                        Status: REQUEST_FAILED,
-                    }
-                    break
-                }
-
-                content, err := file.Open()
-                if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                        Status: REQUEST_FAILED,
-                    }
-                    break
-                }
-
-                buffer := bytes.NewBuffer(nil)
-                io.Copy(buffer, content)
-                fileWriter.Write(buffer.Bytes())
-
-                err = writer.Close()
-                if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                        Status: REQUEST_FAILED,
-                    }
-                    break
-                }
-
-                requests := []map[Instance]*http.Request{}
-                skipGroup := false
-
-                for _, instance := range instances {
-                    request, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", instance.Path), bytes.NewReader(body.Bytes()))
-                    if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                            Status: REQUEST_FAILED,
-                    }
-                        skipGroup = true
-                        break
-                    }
-                    request.Header.Add("Content-Type", writer.FormDataContentType())
-                    requests = append(requests, map[Instance]*http.Request{
-                        instance: request,
-                    })
-                }
-
-                if !skipGroup {
-                    requestGroups[key] = requests
-                }
-            }
-        }
-
-        for key, requestGroup := range requestGroups {
-            result, err := sendGroup(key, requestGroup, metadata)
-            if err != nil {
-                if result.Status != SUCCESS {
-                    failedSaves[key] = result
-                }
-            }
-        }
-
-        
-        if len(failedSaves) > 0 {
-            ctx.JSON(http.StatusInternalServerError, failedSaves)
-        } else {
-            ctx.JSON(http.StatusOK, map[string]string{
-                "message": "files saved successfully",
-            })
-        }
-
-    })
-
-    router.GET("/files", func(ctx *gin.Context) {
-        queryParts := []string{}
-        for key, values := range ctx.Request.URL.Query() {
-            for _, value := range values {
-                queryParts = append(queryParts, fmt.Sprintf("%s=%s", key, value))
-            }
-        }
-        query := strings.Join(queryParts, "&")
-
-        var resp *http.Response
-        var err error
-        client := &http.Client{}
-        for _, instance := range getInstances() {
-            var req *http.Request
-            req, err = http.NewRequest("GET", fmt.Sprintf("%s/files?%s", instance.Path, query), nil)
-            if err != nil {
-                continue
-            }
-            resp, err = client.Do(req)
-            if err != nil || resp.StatusCode / 100 != 2 {
-                continue
-            }
-            break
-        }
-        if err != nil || resp.StatusCode / 100 != 2 {
-            ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "failed to fetch saved files",
-            })
-            return 
-        }
-
-        var result map[string]interface{}
-        buffer := new(bytes.Buffer)
-        _, err = io.Copy(buffer, resp.Body)
-        if err != nil {
-            ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "failed to fetch saved files",
-            })
-            return 
-        }
-
-        json.Unmarshal(buffer.Bytes(), &result)
-        ctx.JSON(http.StatusOK, result)
-    })
-
-    router.GET("/files/:name", func(ctx *gin.Context) {
-        name := ctx.Param("name")
-        var resp *http.Response
-        var err error
-        client := &http.Client{}
-        for _, instance := range getInstances() {
-            var req *http.Request
-            req, err = http.NewRequest("GET", fmt.Sprintf("%s/files/%s", instance.Path, name), nil)
-            if err != nil {
-                continue
-            }
-            resp, err = client.Do(req)
-            if err != nil || resp.StatusCode / 100 != 2 {
-                continue
-            }
-            break
-        }
-        if err != nil || resp.StatusCode / 100 != 2 {
-            ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "failed to fetch file contents",
-            })
-            return
-        }
-
-        buffer := new(bytes.Buffer)
-        _, err = io.Copy(buffer, resp.Body)
-        if err != nil {
-            ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "failed to fetch file contents",
-            })
-            return
-        }
-
-        var result map[string]interface{}
-        json.Unmarshal(buffer.Bytes(), &result)
-        ctx.JSON(http.StatusOK, result)
-    })
+    router.GET("/files/:name", getFileByName)
 
     router.Run(":8080")
 }

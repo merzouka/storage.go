@@ -1,13 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"github.com/merzouka/storage.go/health-check/models"
 	"gorm.io/gorm"
 )
@@ -45,9 +46,15 @@ func ping(instances []models.Instance, index int) {
     }
 }
 
-func checker() {
-    var instances []models.Instance
-    db.Find(&instances)
+func checker(instances []models.Instance) {
+    result := db.Where("1 = 1").Delete(&models.Instance{})
+    if result.Error != nil {
+        log.Fatal("failed to delete old instances")
+    }
+    result = db.Save(&instances)
+    if result.Error != nil {
+        log.Fatal("failed to save instances to database")
+    }
 
     for _, instance := range instances {
         failures[instance.ID] = 0
@@ -57,18 +64,26 @@ func checker() {
         for i := range instances {
             go ping(instances, i)
         }
-        ctx, cancel := context.WithTimeout(context.Background(), PING_TIMEOUT)
-        defer cancel()
-        <-ctx.Done()
+        time.Sleep(PING_TIMEOUT)
     }
 }
 
+func getInstances(names string, namespace string) []models.Instance {
+    result := []models.Instance{}
+    for _, name := range strings.Split(names, ",") {
+        result = append(result, models.Instance{
+            Name: name,
+            Path: fmt.Sprintf("%s.%s.svc.cluster.local:8080", name, namespace),
+        })
+    }
+    return nil
+}
+
 func main() {
-    godotenv.Load(".env")
     db = models.GetConn()
     defer models.CloseConn()
 
-    go checker()
+    go checker(getInstances(os.Getenv("INSTANCES"), os.Getenv("NAMESPACE")))
 
     router := gin.Default()
     router.GET("/healthy", func(ctx *gin.Context) {
@@ -78,5 +93,5 @@ func main() {
             "result": instances,
         })
     })
-    router.Run(":8080")
+    router.Run(":8081")
 }

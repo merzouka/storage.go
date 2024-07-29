@@ -11,10 +11,10 @@ spec:
   resources:
     requests:
       storage: 5Gi
-
   selector:
     matchLabels:
       number: n1
+  storageClassName: manual
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -33,6 +33,7 @@ spec:
   selector:
     matchLabels:
       number: n2
+  storageClassName: manual
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -51,3 +52,4 @@ spec:
   selector:
     matchLabels:
       number: n3
+  storageClassName: manual

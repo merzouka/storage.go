@@ -5,7 +5,6 @@ go 1.22.4
 require (
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
-	github.com/lpernett/godotenv v0.0.0-20230527005122-0de1d4c5ef5e
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/gorm v1.25.11
 )

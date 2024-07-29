@@ -16,7 +16,7 @@ func GetConn() *gorm.DB {
         return db
     }
 
-    sqlDB, err := sql.Open("pgx", os.Getenv("DBURL"))
+    sqlDB, err := sql.Open("pgx", os.Getenv("DB_URL"))
     if err != nil {
         log.Fatal("failed to connect to database")
     }
