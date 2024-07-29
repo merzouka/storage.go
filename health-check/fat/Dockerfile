@@ -20,4 +20,4 @@ EXPOSE 8080
 
 ENV GIN_MODE=release
 ENV LOGS_PATH=/logs
-CMD [ "sleep", "10m" ]
+CMD [ "/check" ]

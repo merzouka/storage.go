@@ -154,6 +154,10 @@ metadata:
   labels:
     app: health-check
 spec:
+  dnsConfig:
+    nameservers:
+      - 8.8.8.8
+      - 8.8.4.4
   containers:
     - name: main
       image: vmerv/storage:fat-check
