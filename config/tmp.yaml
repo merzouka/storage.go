@@ -1,0 +1,26 @@
+# ------------------------------------ HEALTH CHECK
+---          
+apiVersion: v1
+kind: Pod
+metadata:
+  name: check
+  labels:
+    app: health-check
+spec:
+  containers:
+    - name: main
+      image: vmerv/storage:fat-check
+      imagePullPolicy: Always
+      ports:
+        - name: main
+          containerPort: 8080
+      env:
+        - name: DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-url
+              key: db-url
+        - name: INSTANCES
+          value: writer-service1,writer-service2,writer-service3
+        - name: NAMESPACE
+          value: default

@@ -39,8 +39,7 @@ func getName(original string) string {
 }
 
 func getInstances() []Instance {
-    // url := fmt.Sprintf("%s.%s.svc.cluster.local:8080/healthy", os.Getenv("SERVICE"), os.Getenv("NAMESPACE"))
-    url := "localhost:8081/healthy"
+    url := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080/healthy", os.Getenv("SERVICE"), os.Getenv("NAMESPACE"))
     req, err := http.NewRequest("GET", url, nil)
     if err != nil {
         log.Println("request creation failed")

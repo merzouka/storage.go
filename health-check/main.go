@@ -70,16 +70,34 @@ func checker(instances []models.Instance) {
 
 func getInstances(names string, namespace string) []models.Instance {
     result := []models.Instance{}
-    for _, name := range strings.Split(names, ",") {
+    for i, name := range strings.Split(names, ",") {
         result = append(result, models.Instance{
+            ID: uint(i + 1),
             Name: name,
-            Path: fmt.Sprintf("%s.%s.svc.cluster.local:8080", name, namespace),
+            Healthy: true,
+            Path: fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", name, namespace),
         })
     }
-    return nil
+    return result
+}
+
+func setLogger(path string) *os.File {
+    f, err := os.OpenFile(path, os.O_RDWR | os.O_APPEND | os.O_CREATE, 0664)
+    if err != nil {
+        log.Fatal("failed to setup logger")
+    }
+
+    log.SetOutput(f)
+    return f
 }
 
 func main() {
+    path := os.Getenv("LOGS_PATH")
+    if path == "" {
+        path = "./logs"
+    }
+    defer setLogger(path).Close()
+
     db = models.GetConn()
     defer models.CloseConn()
 
@@ -93,5 +111,5 @@ func main() {
             "result": instances,
         })
     })
-    router.Run(":8081")
+    router.Run(":8080")
 }

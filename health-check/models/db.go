@@ -18,14 +18,17 @@ func GetConn() *gorm.DB {
 
     sqlDB, err := sql.Open("pgx", os.Getenv("DB_URL"))
     if err != nil {
-        log.Fatal("failed to connect to database")
+        log.Println("failed to connect to database")
+        return nil
     }
     db, err = gorm.Open(postgres.New(postgres.Config{
         Conn: sqlDB,
     }), &gorm.Config{})
     if err != nil {
-        log.Fatal("failed to create connection")
+        log.Println("failed to create connection")
+        return nil
     }
+    log.Println("successfully connected to database")
     return db
 }
 

@@ -136,6 +136,10 @@ spec:
             secretKeyRef:
               name: db-password
               key: db-password
+        - name: SERVICE
+          value: check-service
+        - name: NAMESPACE
+          value: default
     - name: db
       image: vmerv/storage:metadatadb-v1.0
       ports:
@@ -161,8 +165,8 @@ spec:
         - name: DB_URL
           valueFrom:
             secretKeyRef:
-              - name: db-url
-                key: db-url
+              name: db-url
+              key: db-url
         - name: INSTANCES
           value: writer-service1,writer-service2,writer-service3
         - name: NAMESPACE
