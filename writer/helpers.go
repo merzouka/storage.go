@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -62,6 +64,31 @@ func getFileInfo(info os.FileInfo) map[string]string {
     }
 }
 
+func getOriginalFiles() []string {
+    tmp := map[string]struct{}{}
+    files, err := os.ReadDir("./files/")
+    if err != nil {
+        return []string{}
+    }
+    for _, file := range files {
+        info, err := file.Info()
+        if err != nil {
+            continue
+        }
+        tmp[getOriginal(info.Name())] = struct{}{}
+    }
+    result := []string{}
+    for name := range tmp {
+        result = append(result, name)
+    }
+    return result
+}
+
+func validOriginalFile(file string) bool {
+    log.Println(getOriginalFiles())
+    return slices.Contains(getOriginalFiles(), file)
+}
+
 func validFileName(file string) bool {
     _, err := os.Stat(fmt.Sprintf("./files/%s", file))
     return !strings.Contains(file, "/") && err == nil
@@ -114,8 +141,8 @@ func getRevisions(original string) []os.DirEntry {
         return []os.DirEntry{}
     }
     parts := strings.Split(original, ".")
-    exp := fmt.Sprintf("^%s#[0-9]+", parts[0])
-    if len(parts) > 0 {
+    exp := fmt.Sprintf("^%s#[0-9a-zA-Z]+", parts[0])
+    if len(parts) > 1 {
         exp += "." + parts[1]
     }
     result := []os.DirEntry{}
@@ -153,10 +180,12 @@ func getFilePath(name string) string {
     var err error
     if !strings.Contains(name, "#") {
         revisions := getRevisions(name)
+        log.Println(revisions)
         if len(revisions) == 0 {
             return ""
         }
         latest, err = revisions[0].Info()
+        log.Println(err)
         if err != nil {
             return "" 
         }
@@ -171,8 +200,8 @@ func getFilePath(name string) string {
         }
         name = latest.Name()
     }
-
-    return fmt.Sprintf("./files/%s", latest.Name())
+    log.Println(fmt.Sprintf("file path is %s", fmt.Sprintf("./files/%s", name)))
+    return fmt.Sprintf("./files/%s", name)
 }
 
 func metadataMatch(file string, query string) bool {

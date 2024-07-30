@@ -104,3 +104,14 @@ func saveMetadata(name string, metadata string) (map[string]interface{}, error) 
     }, nil
 }
 
+func emptyResponseBuffer(resp *http.Response) []byte {
+    buffer := new(bytes.Buffer)
+    _, err := io.Copy(buffer, resp.Body)
+    defer resp.Body.Close()
+    if err != nil {
+        log.Println("failed to empty response body")
+        return nil
+    }
+
+    return buffer.Bytes()
+}

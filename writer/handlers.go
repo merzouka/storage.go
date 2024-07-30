@@ -49,7 +49,8 @@ func upload(ctx *gin.Context) {
 func getFileByName(ctx *gin.Context) {
     name := ctx.Params.ByName("name")
     log.Println(fmt.Sprintf("handling request to '/files/%s'", name))
-    if !validFileName(name) {
+    if !(validFileName(name) || validOriginalFile(name)) {
+        log.Println("invalid file request")
         ctx.JSON(http.StatusBadRequest, map[string]string{
             "error": "please provide a valid file name",
         })
@@ -57,13 +58,24 @@ func getFileByName(ctx *gin.Context) {
     }
 
     contents, err := os.ReadFile(getFilePath(name))
+    log.Println(err)
     if err != nil {
+        log.Println("invalid file request")
         ctx.JSON(http.StatusBadRequest, map[string]string{
             "error": "please provide a valid file name",
         })
         return
     }
+
     metadata, err := getFileMetadata(getOriginal(name))
+    if err != nil {
+        log.Println("failed to retrieve meta-data")
+        ctx.JSON(http.StatusOK, map[string]interface{}{
+            "contents": getFileContents(contents),
+            "metadata": nil,
+        })
+        return
+    }
 
     ctx.JSON(http.StatusOK, map[string]interface{}{
         "contents": getFileContents(contents),

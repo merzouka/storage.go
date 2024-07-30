@@ -1,0 +1,13 @@
+2024/07/30 23:09:46 handling request to '/files/file44'
+2024/07/30 23:09:46 [file file44]
+2024/07/30 23:09:46 []
+2024/07/30 23:09:46 open : no such file or directory
+2024/07/30 23:09:46 invalid file request
+2024/07/30 23:10:30 handling request to '/files/file44'
+2024/07/30 23:10:30 [file file44]
+2024/07/30 23:10:30 [- file44#e68f91e6796a9c70757ff2354ae4acb335d8741244c1e27d00df6369339c10d5]
+2024/07/30 23:10:30 <nil>
+2024/07/30 23:10:30 file path is ./files/file44#e68f91e6796a9c70757ff2354ae4acb335d8741244c1e27d00df6369339c10d5
+2024/07/30 23:10:30 <nil>
+2024/07/30 23:10:30 failed to connect to db
+2024/07/30 23:10:30 failed to retrieve meta-data

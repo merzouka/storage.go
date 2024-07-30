@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,11 @@ func getFiles(ctx *gin.Context) {
         }
         resp, err = client.Do(req)
         if err != nil || resp.StatusCode / 100 != 2 {
+            if err == nil {
+                log.Println(emptyResponseBuffer(resp))
+            } else {
+                log.Println(err)
+            }
             continue
         }
         break
@@ -67,19 +73,27 @@ func getFileByName(ctx *gin.Context) {
     client := &http.Client{}
     for _, instance := range getInstances() {
         var req *http.Request
-        req, err = http.NewRequest("GET", fmt.Sprintf("%s/files/%s", instance.Path, name), nil)
+        req, err = http.NewRequest("GET", fmt.Sprintf("%s/files/%s", instance.Path, url.QueryEscape(name)), nil)
         if err != nil {
+            log.Println(err)
             continue
         }
         resp, err = client.Do(req)
         if err != nil || resp.StatusCode / 100 != 2 {
+            if err == nil {
+                log.Println(resp.StatusCode)
+                log.Println(string(emptyResponseBuffer(resp)))
+            } else {
+                log.Println(err)
+            }
             continue
         }
         break
     }
     if err != nil || resp.StatusCode / 100 != 2 {
+        log.Println("connection to back-ends failed")
         ctx.JSON(http.StatusInternalServerError, map[string]string{
-            "error": "failed to fetch file contents",
+            "error": "back-ends did not respond",
         })
         return
     }
@@ -87,8 +101,9 @@ func getFileByName(ctx *gin.Context) {
     buffer := new(bytes.Buffer)
     _, err = io.Copy(buffer, resp.Body)
     if err != nil {
+        log.Println("parsing error")
         ctx.JSON(http.StatusInternalServerError, map[string]string{
-            "error": "failed to fetch file contents",
+            "error": "parsing contents failed",
         })
         return
     }
