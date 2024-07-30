@@ -169,6 +169,10 @@ func main() {
     router := gin.Default()
     router.Use(cors.Default())
 
+    router.GET("/", func(ctx *gin.Context) {
+        ctx.String(http.StatusOK, "hello storage app")
+    })
+
     router.POST("/upload", uploadFiles)
 
     router.GET("/files", getFiles)

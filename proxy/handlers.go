@@ -1,18 +1,20 @@
 package main
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "io"
-    "mime/multipart"
-    "net/http"
-    "strings"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"mime/multipart"
+	"net/http"
+	"strings"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 func getFiles(ctx *gin.Context) {
+    log.Println("handling request for '/files'")
     queryParts := []string{}
     for key, values := range ctx.Request.URL.Query() {
         for _, value := range values {
@@ -59,6 +61,7 @@ func getFiles(ctx *gin.Context) {
 
 func getFileByName(ctx *gin.Context) {
     name := ctx.Param("name")
+    log.Println(fmt.Sprintf("handling request for '/files/%s'", name))
     var resp *http.Response
     var err error
     client := &http.Client{}
@@ -96,94 +99,95 @@ func getFileByName(ctx *gin.Context) {
 }
 
 func uploadFiles(ctx *gin.Context) {
-        form, err := ctx.MultipartForm()
-        if err != nil {
-            ctx.JSON(http.StatusBadRequest, map[string]string{
-                "message": "please provide valid data",
-            })
-            return
-        }
-
-        metadata := ctx.PostForm("meta-data")
-
-        failedSaves := map[string]FileSaveStatus{}
-        requestGroups := map[string][]map[Instance]*http.Request{}
-        instances := getInstances()
-
-        for key, files := range form.File {
-            for _, file := range files {
-                body := new(bytes.Buffer)
-                writer := multipart.NewWriter(body)
-                writer.WriteField("name", getName(key))
-                fileWriter, err := writer.CreateFormFile("file", key)
-
-                if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                        Status: REQUEST_FAILED,
-                    }
-                    break
-                }
-
-                content, err := file.Open()
-                if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                        Status: REQUEST_FAILED,
-                    }
-                    break
-                }
-
-                buffer := bytes.NewBuffer(nil)
-                io.Copy(buffer, content)
-                fileWriter.Write(buffer.Bytes())
-
-                err = writer.Close()
-                if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                        Status: REQUEST_FAILED,
-                    }
-                    break
-                }
-
-                requests := []map[Instance]*http.Request{}
-                skipGroup := false
-
-                for _, instance := range instances {
-                    request, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", instance.Path), bytes.NewReader(body.Bytes()))
-                    if err != nil {
-                    failedSaves[key] = FileSaveStatus{
-                            Status: REQUEST_FAILED,
-                    }
-                        skipGroup = true
-                        break
-                    }
-                    request.Header.Add("Content-Type", writer.FormDataContentType())
-                    requests = append(requests, map[Instance]*http.Request{
-                        instance: request,
-                    })
-                }
-
-                if !skipGroup {
-                    requestGroups[key] = requests
-                }
-            }
-        }
-
-        for key, requestGroup := range requestGroups {
-            result, err := sendGroup(key, requestGroup, metadata)
-            if err != nil {
-                if result.Status != SUCCESS {
-                    failedSaves[key] = result
-                }
-            }
-        }
-
-        
-        if len(failedSaves) > 0 {
-            ctx.JSON(http.StatusInternalServerError, failedSaves)
-        } else {
-            ctx.JSON(http.StatusOK, map[string]string{
-                "message": "files saved successfully",
-            })
-        }
-
+    log.Println("handling request for '/upload'")
+    form, err := ctx.MultipartForm()
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, map[string]string{
+            "message": "please provide valid data",
+        })
+        return
     }
+
+    metadata := ctx.PostForm("meta-data")
+
+    failedSaves := map[string]FileSaveStatus{}
+    requestGroups := map[string][]map[Instance]*http.Request{}
+    instances := getInstances()
+
+    for key, files := range form.File {
+        for _, file := range files {
+            body := new(bytes.Buffer)
+            writer := multipart.NewWriter(body)
+            writer.WriteField("name", getName(key))
+            fileWriter, err := writer.CreateFormFile("file", key)
+
+            if err != nil {
+                failedSaves[key] = FileSaveStatus{
+                    Status: REQUEST_FAILED,
+                }
+                break
+            }
+
+            content, err := file.Open()
+            if err != nil {
+                failedSaves[key] = FileSaveStatus{
+                    Status: REQUEST_FAILED,
+                }
+                break
+            }
+
+            buffer := bytes.NewBuffer(nil)
+            io.Copy(buffer, content)
+            fileWriter.Write(buffer.Bytes())
+
+            err = writer.Close()
+            if err != nil {
+                failedSaves[key] = FileSaveStatus{
+                    Status: REQUEST_FAILED,
+                }
+                break
+            }
+
+            requests := []map[Instance]*http.Request{}
+            skipGroup := false
+
+            for _, instance := range instances {
+                request, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", instance.Path), bytes.NewReader(body.Bytes()))
+                if err != nil {
+                    failedSaves[key] = FileSaveStatus{
+                        Status: REQUEST_FAILED,
+                    }
+                    skipGroup = true
+                    break
+                }
+                request.Header.Add("Content-Type", writer.FormDataContentType())
+                requests = append(requests, map[Instance]*http.Request{
+                    instance: request,
+                })
+            }
+
+            if !skipGroup {
+                requestGroups[key] = requests
+            }
+        }
+    }
+
+    for key, requestGroup := range requestGroups {
+        result, err := sendGroup(key, requestGroup, metadata)
+        if err != nil {
+            if result.Status != SUCCESS {
+                failedSaves[key] = result
+            }
+        }
+    }
+
+
+    if len(failedSaves) > 0 {
+        ctx.JSON(http.StatusInternalServerError, failedSaves)
+    } else {
+        ctx.JSON(http.StatusOK, map[string]string{
+            "message": "files saved successfully",
+        })
+    }
+
+}

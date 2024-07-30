@@ -31,7 +31,7 @@ func main() {
 
     router.DELETE("/rollback", rollback)
 
-    router.GET("/files", getFile)
+    router.GET("/files", getFiles)
 
     router.GET("/files/:name", getFileByName)
 

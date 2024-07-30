@@ -14,6 +14,7 @@ import (
 )
 
 func upload(ctx *gin.Context) {
+    log.Println("handling request to '/upload'")
     buf := new(strings.Builder)
     file, _, err := ctx.Request.FormFile("file")
     name := getName(ctx.PostForm("name"))
@@ -47,6 +48,7 @@ func upload(ctx *gin.Context) {
 
 func getFileByName(ctx *gin.Context) {
     name := ctx.Params.ByName("name")
+    log.Println(fmt.Sprintf("handling request to '/files/%s'", name))
     if !validFileName(name) {
         ctx.JSON(http.StatusBadRequest, map[string]string{
             "error": "please provide a valid file name",
@@ -69,8 +71,8 @@ func getFileByName(ctx *gin.Context) {
     })
 }
 
-func getFile(ctx *gin.Context) {
-    log.Println("entering handler")
+func getFiles(ctx *gin.Context) {
+    log.Println("handling request for '/files'")
     files, err := os.ReadDir("./files")
     query := ctx.Query("query")
     metadataQuery := ctx.Query("meta-data")
@@ -132,47 +134,48 @@ func getFile(ctx *gin.Context) {
 }
 
 func rollback(ctx *gin.Context) {
-        bodyStr := new(strings.Builder)
-        io.Copy(bodyStr, ctx.Request.Body)
-        var body map[string]string
-        err := json.Unmarshal([]byte(bodyStr.String()), &body)
+    log.Println("handling request for '/rollback'")
+    bodyStr := new(strings.Builder)
+    io.Copy(bodyStr, ctx.Request.Body)
+    var body map[string]string
+    err := json.Unmarshal([]byte(bodyStr.String()), &body)
 
-        if err != nil {
-            ctx.JSON(http.StatusBadRequest, map[string]string{
-                "error": "please provide a valid file name",
-            })
-            return
-        }
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, map[string]string{
+            "error": "please provide a valid file name",
+        })
+        return
+    }
 
-        name := body["name"]
-        if !validFileName(name) {
-            ctx.JSON(http.StatusBadRequest, map[string]string{
-                "error": "please provide a valid file name",
-            })
-            return
-        }
+    name := body["name"]
+    if !validFileName(name) {
+        ctx.JSON(http.StatusBadRequest, map[string]string{
+            "error": "please provide a valid file name",
+        })
+        return
+    }
 
-        err = os.Remove(fmt.Sprintf("./files/%s", name))
+    err = os.Remove(fmt.Sprintf("./files/%s", name))
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, map[string]string{
+            "error": "failed to rollback operation",
+        })
+        return
+    }
+
+    if len(getRevisions(getOriginal(name))) == 0 {
+        err := removeMetadata(getOriginal(name))
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, map[string]string{
-                "error": "failed to rollback operation",
+                "message": "deleted file successfully",
+                "error": "failed to delete file meta-data",
             })
             return
         }
-
-        if len(getRevisions(getOriginal(name))) == 0 {
-            err := removeMetadata(getOriginal(name))
-            if err != nil {
-                ctx.JSON(http.StatusInternalServerError, map[string]string{
-                    "message": "deleted file successfully",
-                    "error": "failed to delete file meta-data",
-                })
-                return
-            }
-        }
-
-        log.Printf("rolling back: %s\n", name)
-        ctx.JSON(http.StatusOK, map[string]string{
-            "message": "rollback successful",
-        })
     }
+
+    log.Printf("rolling back: %s\n", name)
+    ctx.JSON(http.StatusOK, map[string]string{
+        "message": "rollback successful",
+    })
+}

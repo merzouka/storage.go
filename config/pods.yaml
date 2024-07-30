@@ -154,6 +154,11 @@ metadata:
   labels:
     app: health-check
 spec:
+  volumes:
+    - name: logs
+      hostPath:
+        path: /logs
+        type: DirectoryOrCreate
   dnsConfig:
     nameservers:
       - 8.8.8.8
@@ -162,10 +167,15 @@ spec:
     - name: main
       image: vmerv/storage:fat-check
       imagePullPolicy: Always
+      volumeMounts:
+        - mountPath: /logs
+          name: logs
       ports:
         - name: main
           containerPort: 8080
       env:
+        - name: LOGS_PATH
+          value: /logs/log
         - name: DB_URL
           valueFrom:
             secretKeyRef:
