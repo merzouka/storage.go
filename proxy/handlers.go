@@ -134,6 +134,9 @@ func uploadFiles(ctx *gin.Context) {
             body := new(bytes.Buffer)
             writer := multipart.NewWriter(body)
             writer.WriteField("name", getName(key))
+            if metadata != "" {
+                writer.WriteField("meta-data", metadata)
+            }
             fileWriter, err := writer.CreateFormFile("file", key)
 
             if err != nil {

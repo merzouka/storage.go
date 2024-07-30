@@ -2,6 +2,7 @@ let saveResponseField = document.getElementById("output")
 let metadataRequestButton = document.getElementById("get-meta-data")
 let metadataOutput = document.getElementById("meta-data")
 let filesList = document.getElementById("files")
+let metadataHolder = document.getElementById("meta-data-result")
 
 document.querySelector("form").addEventListener("submit", (e) => {
     e.preventDefault()
@@ -12,6 +13,7 @@ document.querySelector("form").addEventListener("submit", (e) => {
     for (const file of input.files) {
         formData.append(file.name, file)
     }
+    formData.append("meta-data", metadataHolder.value)
 
     fetch("http://localhost:8080/upload", {
         method: "POST",
@@ -52,4 +54,22 @@ metadataRequestButton.addEventListener("click", (_) => {
             console.log(filesList)
         }).catch((err) => console.log(err))
     }).catch(err => console.log(err))
+})
+
+let metadataAddButton = document.getElementById("meta-data-add")
+let key = document.getElementById("key")
+let value = document.getElementById("value")
+
+metadataAddButton.addEventListener("click", (_) => {
+    if (!key.value) {
+        return
+    }
+    let content = metadataHolder.value
+    if (content) {
+        content += ","
+    }
+    content += `${key.value}=${value.value}`
+    metadataHolder.value = content
+    key.value = ""
+    value.value = ""
 })

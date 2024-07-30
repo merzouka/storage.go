@@ -6,11 +6,29 @@
         <title></title>
         <link href="css/style.css" rel="stylesheet">
         <script defer src="./script.js"></script>
+        <style>
+        .flex-row {
+            display: flex;
+            flex-direction: row;
+        }
+        .flex-col {
+            display: flex;
+            flex-direction: col;
+        }
+        </style>
     </head>
     <body>
         <form>
-            <input type="file" multiple>
-            <button type="submit">done</button>
+            <input type="file" multiple><br>
+            <input type="text" id="meta-data-result" placeholder="meta-data"><br>
+            <div class="flex-row">
+                <div class="flex-col">
+                    <input type="text" id="key" placeholder="key">
+                    <input type="text" id="value" placeholder="value">
+                </div><br>
+                <button id="meta-data-add" type="button">add</button>
+            </div>
+            <button type="submit" id="submit">done</button>
         </form>
         <textarea id="output" cols cols="90" rows="10"></textarea> <br>
         <button id="get-meta-data">Get Meta-Data</button>
