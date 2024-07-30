@@ -8,11 +8,12 @@ metadata:
 spec:
   volumes:
     - name: file-storage
-      persistentVolumeClaim:
-        claimName: pvc1
+      hostPath:
+        path: /files/1
+        type: DirectoryOrCreate
   containers:
     - name: writer
-      image: vmerv/storage:fat-writer
+      image: vmerv/storage:writer-v1.0
       imagePullPolicy: Always
       env:
         - name: DB_PASSWORD
@@ -42,11 +43,12 @@ metadata:
 spec:
   volumes:
     - name: file-storage
-      persistentVolumeClaim:
-        claimName: pvc2
+      hostPath:
+        path: /files/2
+        type: DirectoryOrCreate
   containers:
     - name: writer
-      image: vmerv/storage:fat-writer
+      image: vmerv/storage:writer-v1.0
       imagePullPolicy: Always
       env:
         - name: DB_PASSWORD
@@ -76,11 +78,12 @@ metadata:
 spec:
   volumes:
     - name: file-storage
-      persistentVolumeClaim:
-        claimName: pvc3
+      hostPath:
+        path: /files/3
+        type: DirectoryOrCreate
   containers:
     - name: writer
-      image: vmerv/storage:fat-writer
+      image: vmerv/storage:writer-v1.0
       imagePullPolicy: Always
       env:
         - name: DB_PASSWORD
@@ -125,7 +128,7 @@ metadata:
 spec:
   containers:
     - name: main
-      image: vmerv/storage:fat-proxy
+      image: vmerv/storage:proxy-v1.0
       imagePullPolicy: Always
       ports:
         - name: main
@@ -165,7 +168,7 @@ spec:
       - 8.8.4.4
   containers:
     - name: main
-      image: vmerv/storage:fat-check
+      image: vmerv/storage:check-v1.0
       imagePullPolicy: Always
       volumeMounts:
         - mountPath: /logs

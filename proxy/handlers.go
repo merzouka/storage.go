@@ -81,8 +81,7 @@ func getFileByName(ctx *gin.Context) {
         resp, err = client.Do(req)
         if err != nil || resp.StatusCode / 100 != 2 {
             if err == nil {
-                log.Println(resp.StatusCode)
-                log.Println(string(emptyResponseBuffer(resp)))
+                emptyResponseBuffer(resp)
             } else {
                 log.Println(err)
             }
